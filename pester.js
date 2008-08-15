@@ -4,7 +4,7 @@
   
   String.prototype.tagToVar = function () {
     return this.replace(/-/g, "_");
-  }
+  };
   
   // TODO This function is WACK. Works for now though...
   String.prototype.collectionToClass = function () {
@@ -15,19 +15,19 @@
       return ele.substr(0, 1).toUpperCase() + ele.substr(1, ele.length - 1);
     });
     return words.join('');
-  }
+  };
   
   String.prototype.collectionToVar = function () {
-    return this.replace('-', '_');
-  }
+    return this.replace(/-/g, '_');
+  };
   
   var parseLeafTag = function (tag) {
     var type = $(tag).attr('type');
     var val;
     switch(type) {
       case 'integer':
-        val = parseInt($(tag).text());
-        break
+        val = $(tag).text() ? parseInt($(tag).text(), 10) : null;
+        break;
       case 'boolean':
         val = $(tag).text() ? true : false;
         break;
@@ -35,11 +35,19 @@
         val = $(tag).text();
     }
     return val;
-  }
+  };
+  
+  var buildParams = function (params_obj) {
+    var params = '';
+    $.each(params_obj, function (key, val) {
+      params += encodeURI(key) + '=' + encodeURI(val);
+    });
+    return params;
+  };
   
   var defaults = {
-    class: {
-      new: function (xml) {
+    class_methods: {
+      nnew : function (xml) {
         var instance = new this._instance();
         if (xml) {
           instance.parse_xml(xml);
@@ -59,25 +67,58 @@
         }
         return this._url;
       },
-      find: function (id, callback, reload) {
-        var instance = this.new();
+      find_all: function (callback, params_obj) {
+        var $this = this;
+        var params;
+        if (params_obj) {
+          params = buildParams(params_obj);
+        }
         
-        if (instance.class.instances[id] && (reload != undefined || !reload)) {
+        $.ajax({
+          type: "GET",
+          url: this.resource_path,
+          data: params,
+          success: function (data, textStatus) {
+            var name = $this.resource_name_xml + 's';
+            var results = [];
+            if ($(name, data).size() == 1) {
+              $(name, data).children().each(function () {
+                var instance = $this.nnew(this);
+                results.push(instance);
+              });
+              if (callback) {
+                callback.call(results);
+              }
+            }
+          }
+        });
+      },
+      find: function (id, callback, params_obj, reload) {
+        var params;
+        if (params_obj) {
+          params = buildParams(params_obj);
+        }
+        if (this.instances[id] && this.instances[id]['params'] == params && (reload != undefined || !reload)) {
           if (callback) {
-            callback.call(instance);
+            callback.call(this.instances[id]['instance']);
           }
         } else {
+          var instance = this.nnew();
           $.ajax({
             type: "GET",
             url: this.url_for(id),
+            data: params,
             success: function (data, textStatus) {
-              var name = instance.class.resource_name_xml;
+              var name = instance.class_obj.resource_name_xml;
               if ($(name, data).size() == 1) {
                 instance.parse_xml($(name, data));
               }
               // cache object
               // TODO limit size of cache?
-              instance.class.instances[id] = instance;
+              instance.class_obj.instances[id] = {
+                params: params,
+                instance: instance
+              };
               if (callback) {
                 callback.call(instance);
               }
@@ -116,12 +157,12 @@
               // make array of models
               var collection = [];
               $(children).each(function () {
-                collection.push($[model].new(this));
+                collection.push($[model].nnew(this));
               });
               
               $this[this.tagName.collectionToVar()] = collection;
             } else {
-              $this[this.tagName.collectionToVar()] = $[model].new(this);
+              $this[this.tagName.collectionToVar()] = $[model].nnew(this);
             }
           } else {
             $this[this.tagName.tagToVar()] = this;
@@ -131,7 +172,7 @@
       initialize: function () {
       }
     }
-  }
+  };
   
   jQuery.extend({
     define_model: function (name, obj) {
@@ -149,27 +190,27 @@
       };
       
       // THE 'CLASS' object
-      var class = function () {        
+      var Class = function () {        
         this.resource_name = $.map(name.split(/(?=[A-Z])/), function (ele, i) {
           return ele.toLowerCase();
         }).join('_');
         this.resource_path = this.resource_name + 's';
-        this.resource_name_xml = this.resource_name.replace('_', '-');
+        this.resource_name_xml = this.resource_name.replace(/_/g, '-');
         this.instances = {};
       };
       
-      class = new class();
-      classes[name] = class;
-      instance.prototype.class = class;
-      class._instance = instance;
+      Class = new Class();
+      classes[name] = Class;
+      instance.prototype.class_obj = Class;
+      Class._instance = instance;
       
-      $.each(defaults['class'], function (name, method) {
-        class[name] = function () {
-          return method.apply(class, arguments);
-        }
+      $.each(defaults['class_methods'], function (name, method) {
+        Class[name] = function () {
+          return method.apply(Class, arguments);
+        };
       });
       
-      jQueryExtObj[name] = class;
+      jQueryExtObj[name] = Class;
       
       jQuery.extend(jQueryExtObj);
     }
