@@ -47,7 +47,7 @@
   
   var defaults = {
     class_methods: {
-      nnew : function (xml) {
+      New : function (xml) {
         var instance = new this._instance();
         if (xml) {
           instance.parse_xml(xml);
@@ -83,7 +83,7 @@
             var results = [];
             if ($(name, data).size() == 1) {
               $(name, data).children().each(function () {
-                var instance = $this.nnew(this);
+                var instance = $this.New(this);
                 results.push(instance);
               });
               if (callback) {
@@ -98,12 +98,12 @@
         if (params_obj) {
           params = buildParams(params_obj);
         }
-        if (this.instances[id] && this.instances[id]['params'] == params && (reload != undefined || !reload)) {
+        if (this.instances[id] && this.instances[id][params] && (reload == undefined || !reload)) {
           if (callback) {
-            callback.call(this.instances[id]['instance']);
+            callback.call(this.instances[id][params]);
           }
         } else {
-          var instance = this.nnew();
+          var instance = this.New();
           $.ajax({
             type: "GET",
             url: this.url_for(id),
@@ -115,10 +115,10 @@
               }
               // cache object
               // TODO limit size of cache?
-              instance.class_obj.instances[id] = {
-                params: params,
-                instance: instance
-              };
+              if (!instance.class_obj.instances[id]) {
+                instance.class_obj.instances[id] = {};
+              }
+              instance.class_obj.instances[id][params] = instance;
               if (callback) {
                 callback.call(instance);
               }
@@ -157,12 +157,12 @@
               // make array of models
               var collection = [];
               $(children).each(function () {
-                collection.push($[model].nnew(this));
+                collection.push($[model].New(this));
               });
               
               $this[this.tagName.collectionToVar()] = collection;
             } else {
-              $this[this.tagName.collectionToVar()] = $[model].nnew(this);
+              $this[this.tagName.collectionToVar()] = $[model].New(this);
             }
           } else {
             $this[this.tagName.tagToVar()] = this;
@@ -186,6 +186,13 @@
             return method.apply($this, arguments);
           };
         });
+        if (obj && obj['instance']) {
+          $.each(obj['instance'], function (name, method) {
+            $this[name] = function () {
+              return method.apply($this, arguments);
+            };
+          });
+        }
         this.initialize.call(this);
       };
       
