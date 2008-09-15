@@ -76,7 +76,7 @@
         
         $.ajax({
           type: "GET",
-          url: this.resource_path,
+          url: '/' + this.resource_path,
           data: params,
           success: function (data, textStatus) {
             var name = $this.resource_name_xml + 's';
@@ -106,7 +106,7 @@
           var instance = this.New();
           $.ajax({
             type: "GET",
-            url: this.url_for(id),
+            url: '/' + this.url_for(id),
             data: params,
             success: function (data, textStatus) {
               var name = instance.class_obj.resource_name_xml;
