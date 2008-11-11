@@ -28,8 +28,11 @@
       case 'integer':
         val = $(tag).text() ? parseInt($(tag).text(), 10) : null;
         break;
+      case 'float':
+        val = $(tag).text() ? parseFloat($(tag).text(), 10) : null;
+        break;
       case 'boolean':
-        val = $(tag).text() ? true : false;
+        val = $(tag).text() == 'true' ? true : false;
         break;
       default:
         val = $(tag).text();
@@ -40,7 +43,7 @@
   var buildParams = function (params_obj) {
     var params = '';
     $.each(params_obj, function (key, val) {
-      params += encodeURI(key) + '=' + encodeURI(val);
+      params += '&' + encodeURI(key) + '=' + encodeURI(val);
     });
     return params;
   };
@@ -112,6 +115,9 @@
               var name = instance.class_obj.resource_name_xml;
               if ($(name, data).size() == 1) {
                 instance.parse_xml($(name, data));
+                if (params_obj) {
+                  instance.params_obj = params_obj;
+                }
               }
               // cache object
               // TODO limit size of cache?
@@ -128,6 +134,24 @@
       }
     },
     instance: {
+      merge_params: function (new_params_obj) {
+        var res_params = {};
+        if (this.params_obj) {
+          $.each(this.params_obj, function (key, val) {
+            if (new_params_obj[key]) {
+              res_params[key] = new_params_obj[key];
+            } else {
+              res_params[key] = val;
+            }
+          });
+        }
+        $.each(new_params_obj, function (key, val) {
+          if (!res_params[key]) {
+            res_params[key] = val;
+          }
+        });
+        return res_params;
+      },
       parse_xml: function (xml) {
         var $this = this;
         
@@ -216,6 +240,13 @@
           return method.apply(Class, arguments);
         };
       });
+      if (obj && obj['class_methods']) {
+        $.each(obj['class_methods'], function (name, method) {
+          Class[name] = function () {
+            return method.apply(Class, arguments);
+          };
+        });
+      }
       
       jQueryExtObj[name] = Class;
       
